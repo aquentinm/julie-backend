@@ -74,7 +74,7 @@ app.post("/webhook/whatsapp", async (req, res) => {
 
 Notre équipe va vérifier dans les 2 heures et activer votre assistant.
 
-Vous recevrez un message de confirmation dès que c'est fait. Bienvenue dans la famille AI TRADER CENTER ! 🌿😊</Message></Response>`);
+Vous recevrez un message de confirmation dès que c'est fait. Bienvenue dans la famille AI SALLERS AGENCY ! 🌿😊</Message></Response>`);
       return;
     }
 
@@ -167,7 +167,7 @@ RÈGLES ABSOLUES :
       { role: "system", content: systemPrompt },
       ...sessions[from].messages
     ],
-    max_tokens: 400,
+    max_tokens: 150,
   });
 
   let reply = response.choices[0].message.content;
