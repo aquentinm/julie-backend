@@ -9,9 +9,6 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const SHEETDB_URL = "https://sheetdb.io/api/v1/wesan24zm1o21";
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
-const VERIFY_TOKEN = "julie2024secret";
 
 const sessions = {};
 
@@ -23,160 +20,139 @@ app.get("/health", (_, res) => {
   res.json({ status: "Julie is alive 🌿" });
 });
 
-// Vérification webhook Meta
-app.get("/webhook/whatsapp", (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("✅ Webhook Meta vérifié !");
-    return res.status(200).send(challenge);
-  }
-  res.sendStatus(403);
-});
-
-// Réception des messages Meta WhatsApp
 app.post("/webhook/whatsapp", async (req, res) => {
-  try {
-    const entry = req.body?.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
-    const messages = value?.messages;
+  const message = req.body?.Body || "";
+  const from = req.body?.From;
+  const numMedia = parseInt(req.body?.NumMedia || "0");
+  console.log(`📨 Message de ${from} : ${message}`);
 
-    if (!messages?.length) return res.sendStatus(200);
+  if (!sessions[from]) sessions[from] = [];
 
-    const msg = messages[0];
-    const from = msg.from;
-    const message = msg.text?.body || "";
-    const hasImage = msg.type === "image";
-
-    console.log(`📨 Message de ${from} : ${message}`);
-
-    if (!sessions[from]) sessions[from] = [];
-
-    // Si le client envoie une image (preuve de paiement)
-    if (hasImage) {
-      try {
-        await fetch(SHEETDB_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            data: [{
-              Numéro: from,
-              Nom: sessions[from].prospectNom || "Inconnu",
-              Ville: sessions[from].prospectVille || "Inconnue",
-              Commerce: sessions[from].prospectCommerce || "Inconnu",
-              Statut: "À valider",
-              Date: new Date().toLocaleString("fr-FR")
-            }]
-          })
-        });
-      } catch (err) {
-        console.error("❌ Erreur SheetDB:", err);
-      }
-
-      await sendMessage(from, "Merci pour votre preuve de paiement ! 📸✅\n\nNotre équipe va vérifier dans les 30 minutes et activer votre service.\n\nVous recevrez une confirmation dès que c'est fait 😊");
-      return res.sendStatus(200);
+  if (numMedia > 0) {
+    try {
+      await fetch(SHEETDB_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data: [{
+            Numéro: from,
+            Nom: sessions[from].prospectNom || "Inconnu",
+            Ville: sessions[from].prospectVille || "Inconnue",
+            Commerce: sessions[from].prospectCommerce || "Inconnu",
+            Statut: "À valider",
+            Date: new Date().toLocaleString("fr-FR")
+          }]
+        })
+      });
+    } catch (err) {
+      console.error("❌ Erreur SheetDB:", err);
     }
 
-    sessions[from].push({ role: "user", content: message });
+    res.set("Content-Type", "text/xml");
+    res.send(`<Response><Message>Merci pour votre preuve de paiement ! 📸✅\n\nNotre équipe va vérifier dans les 30 minutes et activer votre service.\n\nVous recevrez une confirmation dès que c'est fait 😊</Message></Response>`);
+    return;
+  }
 
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: `Tu es Julie, l'assistante commerciale virtuelle d'AI TRADER CENTER, une entreprise basée à Dolisie, Congo, qui aide les petits commerçants et entrepreneurs à automatiser leur WhatsApp grâce à l'intelligence artificielle.
+  sessions[from].push({ role: "user", content: message });
 
-SOLUTION PROPOSÉE :
-- Assistante Personnelle WhatsApp 24h/24 : un agent IA qui répond automatiquement aux clients, prend les commandes et relance les prospects
+  const response = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: `Tu es Julie, l'assistante virtuelle et commerciale d'AI TRADER CENTER, basée à Dolisie, Congo. Tu aides les petits commerçants à automatiser leur WhatsApp grâce à l'IA.
+
+TON RÔLE : Tu es un guide bienveillant et expert, pas un vendeur agressif. Tu vends de la liberté, de la sérénité et de la croissance — pas de la technologie.
+
+SOLUTION :
+- Un assistant WhatsApp IA qui travaille 24h/24 à la place du commerçant
+- Il répond aux clients, prend les commandes, relance les prospects automatiquement
 - Prix : 14 900 FCFA (installation + 1er mois) puis 9 900 FCFA/mois
 
-PROCESSUS DE VENTE :
-1. Présenter la solution simplement
-2. Répondre aux questions
-3. Collecter : nom, ville, type de commerce
-4. Quand le prospect est convaincu, envoyer EXACTEMENT ce message :
-"Pour finaliser votre inscription, veuillez envoyer 14 900 FCFA sur l'un de ces numéros :
+PROCESSUS DE VENTE EN 7 ÉTAPES :
+
+ÉTAPE 1 — ATTIRER PAR L'ÉMOTION :
+Commence par peindre une vision de liberté. Parle d'un "assistant infatigable" qui veille sur leur commerce pendant qu'ils dorment. Ex : "Imaginez ouvrir votre téléphone chaque matin pour voir des commandes prises automatiquement pendant la nuit 🌙"
+
+ÉTAPE 2 — CRÉER LA CONFIANCE :
+Montre que tu comprends leurs peurs : peur de perdre des clients, peur de manquer des ventes, fatigue de répondre aux mêmes questions. Positionne-toi comme un partenaire, pas un vendeur.
+
+ÉTAPE 3 — DÉCOUVERTE (méthode SPIN) :
+Pose ces questions dans l'ordre naturel de la conversation :
+- "Comment gérez-vous vos messages WhatsApp actuellement ?"
+- "Quelles questions vous prennent le plus de temps chaque jour ?"
+- "Combien de ventes pensez-vous perdre à cause des réponses tardives ?"
+- "Si 80% de ces tâches étaient automatisées, quel impact sur vos ventes ?"
+
+ÉTAPE 4 — VISUALISATION :
+Ne liste pas les fonctionnalités. Fais visualiser : "Nos clients commerçants retrouvent une tranquillité d'esprit dès la première semaine. Pendant qu'ils se reposent, leur assistant répond, qualifie et prend les commandes."
+
+ÉTAPE 5 — GESTION DES OBJECTIONS :
+- "C'est trop cher" → "Je comprends. Combien vous coûte chaque jour passé à répondre manuellement ? Un seul client perdu par semaine dépasse largement 9 900 FCFA."
+- "Je ne suis pas sûr" → "C'est normal d'hésiter. Qu'est-ce qui vous retient exactement ?"
+- "Je vais réfléchir" → "Bien sûr. Pour vous aider à décider, dites-moi : quel est votre plus grand défi avec WhatsApp en ce moment ?"
+
+ÉTAPE 6 — CLOSING NATUREL :
+Quand le prospect est chaud, utilise le choix alternatif : "Souhaitez-vous qu'on commence l'installation cette semaine ou la semaine prochaine ?" Ou la présomption : "À quel numéro WhatsApp devons-nous relier votre assistant ?"
+
+ÉTAPE 7 — PAIEMENT :
+Quand le prospect confirme, envoie EXACTEMENT :
+"Parfait ! 🎉 Pour activer votre assistant, veuillez envoyer 14 900 FCFA sur l'un de ces numéros :
 
 💛 MTN Money : +242 06 469 8213
 ❤️ Airtel Money : +242 05 062 1003
 
-Ensuite envoyez-moi une capture d'écran de votre transaction pour confirmation 📸"
+Ensuite envoyez-moi une capture d'écran de votre transaction 📸 et votre assistant sera actif dans les 30 minutes !"
 
-RÈGLES :
-1. Réponds TOUJOURS en français, de manière amicale et professionnelle
-2. Vouvoie TOUJOURS les clients — jamais de "tu"
-3. Sois concise — c'est WhatsApp, pas un email
+RÈGLES ABSOLUES :
+1. Vouvoie TOUJOURS les clients — jamais de "tu"
+2. Réponds en français, de manière chaleureuse et professionnelle
+3. Sois concise — messages courts adaptés à WhatsApp
 4. Utilise des emojis avec modération 😊
-5. Quand tu as collecté le nom, la ville ET le type de commerce, ajoute à la fin : [SAUVEGARDER:nom|ville|commerce]
+5. Quand tu as collecté nom, ville ET commerce, ajoute UNE SEULE FOIS : [SAUVEGARDER:nom|ville|commerce]
 6. Ne promets jamais ce que la solution ne peut pas faire
-7. Si une question est trop technique, dis que l'équipe va rappeler` },
-        ...sessions[from].filter(m => m.role)
-      ],
-      max_tokens: 300,
-    });
-
-    let reply = response.choices[0].message.content;
-    console.log(`🤖 Julie répond : ${reply}`);
-
-    sessions[from].push({ role: "assistant", content: reply });
-
-    // Détecter et sauvegarder prospect (une seule fois)
-    const match = reply.match(/\[SAUVEGARDER:(.+)\|(.+)\|(.+)\]/);
-    if (match && !sessions[from].prospectNom) {
-      const [, nom, ville, commerce] = match;
-      sessions[from].prospectNom = nom;
-      sessions[from].prospectVille = ville;
-      sessions[from].prospectCommerce = commerce;
-
-      try {
-        await fetch(SHEETDB_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            data: [{
-              Numéro: from,
-              Nom: nom,
-              Ville: ville,
-              Commerce: commerce,
-              Statut: "Prospect",
-              Date: new Date().toLocaleString("fr-FR")
-            }]
-          })
-        });
-        console.log(`✅ Prospect sauvegardé : ${nom} - ${ville} - ${commerce}`);
-      } catch (err) {
-        console.error("❌ Erreur SheetDB:", err);
-      }
-    }
-
-    // Supprimer la balise avant d'envoyer
-    reply = reply.replace(/\[SAUVEGARDER:.+\]/, "").trim();
-
-    await sendMessage(from, reply);
-    res.sendStatus(200);
-
-  } catch (error) {
-    console.error("❌ Erreur webhook:", error);
-    res.sendStatus(500);
-  }
-});
-
-// Fonction d'envoi de message via Meta API
-async function sendMessage(to, message) {
-  await fetch(`https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: { body: message }
-    })
+7. Tu es un partenaire de croissance, pas un vendeur` },
+      ...sessions[from].filter(m => m.role)
+    ],
+    max_tokens: 350,
   });
-}
+
+  let reply = response.choices[0].message.content;
+  console.log(`🤖 Julie répond : ${reply}`);
+
+  sessions[from].push({ role: "assistant", content: reply });
+
+  const match = reply.match(/\[SAUVEGARDER:(.+)\|(.+)\|(.+)\]/);
+  if (match && !sessions[from].prospectNom) {
+    const [, nom, ville, commerce] = match;
+    sessions[from].prospectNom = nom;
+    sessions[from].prospectVille = ville;
+    sessions[from].prospectCommerce = commerce;
+
+    try {
+      await fetch(SHEETDB_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data: [{
+            Numéro: from,
+            Nom: nom,
+            Ville: ville,
+            Commerce: commerce,
+            Statut: "Prospect",
+            Date: new Date().toLocaleString("fr-FR")
+          }]
+        })
+      });
+      console.log(`✅ Prospect sauvegardé : ${nom} - ${ville} - ${commerce}`);
+    } catch (err) {
+      console.error("❌ Erreur SheetDB:", err);
+    }
+  }
+
+  reply = reply.replace(/\[SAUVEGARDER:.+\]/, "").trim();
+
+  res.set("Content-Type", "text/xml");
+  res.send(`<Response><Message>${reply}</Message></Response>`);
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Julie tourne sur le port ${PORT}`);
