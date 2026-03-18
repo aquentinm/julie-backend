@@ -26,100 +26,170 @@ app.post("/webhook/whatsapp", async (req, res) => {
   const numMedia = parseInt(req.body?.NumMedia || "0");
   console.log(`📨 Message de ${from} : ${message}`);
 
-  if (!sessions[from]) sessions[from] = [];
+  if (!sessions[from]) sessions[from] = {
+    messages: [],
+    prospectNom: null,
+    prospectVille: null,
+    prospectCommerce: null,
+    dossierComplet: false,
+    paiementRecu: false,
+    photos: []
+  };
 
+  // Photo reçue
   if (numMedia > 0) {
-    try {
-      await fetch(SHEETDB_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          data: [{
-            Numéro: from,
-            Nom: sessions[from].prospectNom || "Inconnu",
-            Ville: sessions[from].prospectVille || "Inconnue",
-            Commerce: sessions[from].prospectCommerce || "Inconnu",
-            Statut: "À valider",
-            Date: new Date().toLocaleString("fr-FR")
-          }]
-        })
-      });
-    } catch (err) {
-      console.error("❌ Erreur SheetDB:", err);
+    // Preuve de paiement (après dossier complet)
+    if (sessions[from].dossierComplet && !sessions[from].paiementRecu) {
+      sessions[from].paiementRecu = true;
+
+      try {
+        await fetch(SHEETDB_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            data: [{
+              Numéro: from,
+              Nom: sessions[from].prospectNom || "Inconnu",
+              Ville: sessions[from].prospectVille || "Inconnue",
+              Commerce: sessions[from].prospectCommerce || "Inconnu",
+              "Nom Boutique": sessions[from].nomBoutique || "",
+              "Produits": sessions[from].produits || "",
+              "Livraison": sessions[from].livraison || "",
+              "Horaires": sessions[from].horaires || "",
+              "Numéro WA": sessions[from].numeroWA || "",
+              "Autres": sessions[from].autres || "",
+              "Nb Photos Produits": sessions[from].photos.length,
+              Statut: "Paiement à valider",
+              Date: new Date().toLocaleString("fr-FR")
+            }]
+          })
+        });
+        console.log(`📸 Paiement reçu de ${from}`);
+      } catch (err) {
+        console.error("❌ Erreur SheetDB:", err);
+      }
+
+      res.set("Content-Type", "text/xml");
+      res.send(`<Response><Message>Merci pour votre preuve de paiement ! 📸✅
+
+Notre équipe va vérifier dans les 2 heures et activer votre assistant.
+
+Vous recevrez un message de confirmation dès que c'est fait. Bienvenue dans la famille AI TRADER CENTER ! 🌿😊</Message></Response>`);
+      return;
     }
 
-    res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>Merci pour votre preuve de paiement ! 📸✅\n\nNotre équipe va vérifier dans les 30 minutes et activer votre service.\n\nVous recevrez une confirmation dès que c'est fait 😊</Message></Response>`);
-    return;
+    // Photos de produits (pendant la collecte du dossier)
+    if (!sessions[from].dossierComplet) {
+      sessions[from].photos.push("photo_produit");
+      res.set("Content-Type", "text/xml");
+      res.send(`<Response><Message>Photo reçue ! 📸✅ Envoyez d'autres photos ou tapez *continuer* pour passer à la suite 😊</Message></Response>`);
+      return;
+    }
   }
 
-  sessions[from].push({ role: "user", content: message });
+  sessions[from].messages.push({ role: "user", content: message });
 
-  const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    messages: [
-      { role: "system", content: `Tu es Julie, l'assistante virtuelle et commerciale d'AI TRADER CENTER, basée à Dolisie, Congo. Tu aides les petits commerçants à automatiser leur WhatsApp grâce à l'IA.
+  // Choisir le prompt selon l'étape
+  let systemPrompt = "";
 
-TON RÔLE : Tu es un guide bienveillant et expert, pas un vendeur agressif. Tu vends de la liberté, de la sérénité et de la croissance — pas de la technologie.
+  if (!sessions[from].dossierComplet) {
+    systemPrompt = `Tu es Julie, l'assistante commerciale virtuelle d'AI TRADER CENTER, basée à Dolisie, Congo. Tu aides les petits commerçants à automatiser leur WhatsApp grâce à l'IA.
+
+TON RÔLE : Guide bienveillant et expert. Tu vends de la liberté, de la sérénité et de la croissance — pas de la technologie.
 
 SOLUTION :
 - Un assistant WhatsApp IA qui travaille 24h/24 à la place du commerçant
 - Il répond aux clients, prend les commandes, relance les prospects automatiquement
 - Prix : 14 900 FCFA (installation + 1er mois) puis 9 900 FCFA/mois
 
-PROCESSUS DE VENTE EN 7 ÉTAPES :
+PROCESSUS DE VENTE :
 
-ÉTAPE 1 — ATTIRER PAR L'ÉMOTION :
-Commence par peindre une vision de liberté. Parle d'un "assistant infatigable" qui veille sur leur commerce pendant qu'ils dorment. Ex : "Imaginez ouvrir votre téléphone chaque matin pour voir des commandes prises automatiquement pendant la nuit 🌙"
+PHASE 1 — CONVAINCRE (méthode SPIN) :
+1. Crée la vision : "Imaginez ouvrir votre téléphone chaque matin pour voir des commandes prises automatiquement pendant la nuit 🌙"
+2. Comprends leurs douleurs : réponses manuelles, ventes perdues, fatigue
+3. Questions SPIN :
+   - "Comment gérez-vous vos messages WhatsApp actuellement ?"
+   - "Quelles questions vous prennent le plus de temps ?"
+   - "Combien de ventes perdez-vous à cause des réponses tardives ?"
+   - "Si 80% de ces tâches étaient automatisées, quel impact sur vos ventes ?"
+4. Gère les objections :
+   - "Trop cher" → "Combien vous coûte chaque jour passé à répondre manuellement ?"
+   - "Je réfléchis" → "Qu'est-ce qui vous retient exactement ?"
 
-ÉTAPE 2 — CRÉER LA CONFIANCE :
-Montre que tu comprends leurs peurs : peur de perdre des clients, peur de manquer des ventes, fatigue de répondre aux mêmes questions. Positionne-toi comme un partenaire, pas un vendeur.
+PHASE 2 — COLLECTER LE DOSSIER (quand le prospect est convaincu) :
+Dis : "Parfait ! Avant de procéder au paiement, j'ai besoin de quelques informations pour préparer votre assistant 😊"
 
-ÉTAPE 3 — DÉCOUVERTE (méthode SPIN) :
-Pose ces questions dans l'ordre naturel de la conversation :
-- "Comment gérez-vous vos messages WhatsApp actuellement ?"
-- "Quelles questions vous prennent le plus de temps chaque jour ?"
-- "Combien de ventes pensez-vous perdre à cause des réponses tardives ?"
-- "Si 80% de ces tâches étaient automatisées, quel impact sur vos ventes ?"
+Collecte dans l'ordre, UNE question à la fois :
+1. Nom de la boutique → [NOM_BOUTIQUE:xxx]
+2. Produits vendus avec leurs prix → [PRODUITS:xxx]
+3. Fait-il de la livraison ?
+   - OUI → zone + frais → [LIVRAISON:oui|zone|frais]
+   - NON → [LIVRAISON:non]
+4. Horaires d'ouverture → [HORAIRES:xxx]
+5. Numéro WhatsApp dédié à l'assistant → [NUMERO_WA:xxx]
+6. Autres infos utiles (adresse, spécialités, promotions) → [AUTRES:xxx]
+7. Photos des produits : "Envoyez maintenant les photos de vos produits 📸 Tapez *continuer* quand vous avez terminé"
 
-ÉTAPE 4 — VISUALISATION :
-Ne liste pas les fonctionnalités. Fais visualiser : "Nos clients commerçants retrouvent une tranquillité d'esprit dès la première semaine. Pendant qu'ils se reposent, leur assistant répond, qualifie et prend les commandes."
+PHASE 3 — PAIEMENT (après collecte complète) :
+Fais un récapitulatif du dossier puis dis EXACTEMENT :
+"Votre dossier est prêt ! 🎉 
 
-ÉTAPE 5 — GESTION DES OBJECTIONS :
-- "C'est trop cher" → "Je comprends. Combien vous coûte chaque jour passé à répondre manuellement ? Un seul client perdu par semaine dépasse largement 9 900 FCFA."
-- "Je ne suis pas sûr" → "C'est normal d'hésiter. Qu'est-ce qui vous retient exactement ?"
-- "Je vais réfléchir" → "Bien sûr. Pour vous aider à décider, dites-moi : quel est votre plus grand défi avec WhatsApp en ce moment ?"
+Voici le récapitulatif :
+📌 Boutique : [nom]
+🛍️ Produits : [liste]
+🚚 Livraison : [détails]
+⏰ Horaires : [horaires]
+📱 WhatsApp : [numéro]
 
-ÉTAPE 6 — CLOSING NATUREL :
-Quand le prospect est chaud, utilise le choix alternatif : "Souhaitez-vous qu'on commence l'installation cette semaine ou la semaine prochaine ?" Ou la présomption : "À quel numéro WhatsApp devons-nous relier votre assistant ?"
+Il ne reste plus qu'une étape pour activer votre assistant ! 
 
-ÉTAPE 7 — PAIEMENT :
-Quand le prospect confirme, envoie EXACTEMENT :
-"Parfait ! 🎉 Pour activer votre assistant, veuillez envoyer 14 900 FCFA sur l'un de ces numéros :
-
+Veuillez envoyer 14 900 FCFA sur :
 💛 MTN Money : +242 06 469 8213
 ❤️ Airtel Money : +242 05 062 1003
 
-Ensuite envoyez-moi une capture d'écran de votre transaction 📸 et votre assistant sera actif dans 2 heures !"
+Ensuite envoyez-moi une capture d'écran de votre transaction 📸"
+
+Puis ajoute [DOSSIER_COMPLET]
 
 RÈGLES ABSOLUES :
-1. Vouvoie TOUJOURS les clients — jamais de "tu"
-2. Réponds en français, de manière chaleureuse et professionnelle
-3. Sois concise — messages courts adaptés à WhatsApp
-4. Utilise des emojis avec modération 😊
-5. Quand tu as collecté nom, ville ET commerce, ajoute UNE SEULE FOIS : [SAUVEGARDER:nom|ville|commerce]
-6. Ne promets jamais ce que la solution ne peut pas faire
-7. Tu es un partenaire de croissance, pas un vendeur` },
-      ...sessions[from].filter(m => m.role)
+1. Vouvoie TOUJOURS
+2. Français, chaleureux et professionnel
+3. Messages courts adaptés à WhatsApp
+4. Emojis avec modération 😊
+5. Quand tu as nom, ville ET commerce → ajoute UNE FOIS : [SAUVEGARDER:nom|ville|commerce]
+6. Ne promets jamais ce que la solution ne peut pas faire`;
+  }
+
+  const response = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...sessions[from].messages
     ],
-    max_tokens: 350,
+    max_tokens: 400,
   });
 
   let reply = response.choices[0].message.content;
   console.log(`🤖 Julie répond : ${reply}`);
 
-  sessions[from].push({ role: "assistant", content: reply });
+  sessions[from].messages.push({ role: "assistant", content: reply });
 
+  // Extraire les infos du dossier
+  const nomBoutique = reply.match(/\[NOM_BOUTIQUE:(.+?)\]/)?.[1];
+  const produits = reply.match(/\[PRODUITS:(.+?)\]/)?.[1];
+  const livraison = reply.match(/\[LIVRAISON:(.+?)\]/)?.[1];
+  const horaires = reply.match(/\[HORAIRES:(.+?)\]/)?.[1];
+  const numeroWA = reply.match(/\[NUMERO_WA:(.+?)\]/)?.[1];
+  const autres = reply.match(/\[AUTRES:(.+?)\]/)?.[1];
+
+  if (nomBoutique) sessions[from].nomBoutique = nomBoutique;
+  if (produits) sessions[from].produits = produits;
+  if (livraison) sessions[from].livraison = livraison;
+  if (horaires) sessions[from].horaires = horaires;
+  if (numeroWA) sessions[from].numeroWA = numeroWA;
+  if (autres) sessions[from].autres = autres;
+
+  // Sauvegarder prospect UNE SEULE FOIS
   const match = reply.match(/\[SAUVEGARDER:(.+)\|(.+)\|(.+)\]/);
   if (match && !sessions[from].prospectNom) {
     const [, nom, ville, commerce] = match;
@@ -148,7 +218,23 @@ RÈGLES ABSOLUES :
     }
   }
 
-  reply = reply.replace(/\[SAUVEGARDER:.+\]/, "").trim();
+  // Dossier complet
+  if (reply.includes("[DOSSIER_COMPLET]")) {
+    sessions[from].dossierComplet = true;
+    console.log(`📋 Dossier complet pour ${from}`);
+  }
+
+  // Nettoyer toutes les balises
+  reply = reply
+    .replace(/\[NOM_BOUTIQUE:.+?\]/g, "")
+    .replace(/\[PRODUITS:.+?\]/g, "")
+    .replace(/\[LIVRAISON:.+?\]/g, "")
+    .replace(/\[HORAIRES:.+?\]/g, "")
+    .replace(/\[NUMERO_WA:.+?\]/g, "")
+    .replace(/\[AUTRES:.+?\]/g, "")
+    .replace(/\[SAUVEGARDER:.+?\]/g, "")
+    .replace(/\[DOSSIER_COMPLET\]/g, "")
+    .trim();
 
   res.set("Content-Type", "text/xml");
   res.send(`<Response><Message>${reply}</Message></Response>`);
