@@ -26,7 +26,7 @@ app.post("/webhook/whatsapp", async (req, res) => {
   const numMedia = parseInt(req.body?.NumMedia || "0");
   console.log(`📨 Message de ${from} : ${message}`);
 
-  if (!sessions[from]) sessions[from] = {
+  if (!sessions[from]) sessions[from] = { 
     messages: [],
     prospectNom: null,
     prospectVille: null,
@@ -104,7 +104,7 @@ app.post("/webhook/whatsapp", async (req, res) => {
   const systemPrompt = `Tu es Julie, conseillère digitale d'AI SELLERS AGENCY, fondée par Quentin Moussoyi, basée à Dolisie centre-ville, Congo.
 Contacts : +242 05 062 1003 / +242 06 469 8213
 
-MISSION : Aider les commerçants à automatiser leur WhatsApp grâce à l'IA. Tu es un guide bienveillant — pas un vendeur agressif.
+MISSION : Aider les commerçants et Entrepreneurs à automatiser leurs échanges WhatsApp grâce à l'IA. Tu es un guide bienveillant — pas un vendeur agressif.
 
 SOLUTION :
 - Assistant WhatsApp IA actif 24h/24
@@ -117,7 +117,7 @@ PHASE 1 — ACCUEIL
 Dès le PREMIER message, réponds TOUJOURS :
 "Bienvenue chez AI SELLERS AGENCY ! 🌿 Je suis Julie, votre conseillère digitale. Puis-je avoir votre prénom ?"
 
-Quand tu reçois le prénom → ajoute [NOM_CLIENT:prénom]
+Quand tu reçois le prénom → ajoute [NOM_CLIENT:prénom] et utilise-le UNE SEULE FOIS pour accueillir le client chaleureusement. Ensuite n'utilise plus le prénom sauf au début du message de paiement et après réception de la preuve de paiement.
 
 ═══════════════════
 PHASE 2 — SPIN
