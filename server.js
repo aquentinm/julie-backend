@@ -93,6 +93,7 @@ app.post("/webhook/whatsapp", async (req, res) => {
   if (sessions[from].messages.length === 0) {
     const accueil = "Bienvenue chez AI SELLERS AGENCY ! 🌿 Je suis Julie, votre conseillère digitale.\n\nPuis-je avoir votre prénom ?";
     sessions[from].messages.push({ role: "user", content: message });
+    sessions[from].messages.push({ role: "assistant", content: accueil });
     res.set("Content-Type", "text/xml");
     res.send(`<Response><Message>${accueil}</Message></Response>`);
     return;
@@ -269,4 +270,3 @@ RÈGLES ABSOLUES
 app.listen(PORT, () => {
   console.log(`🚀 Julie tourne sur le port ${PORT}`);
 });
-
