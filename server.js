@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";
+import twilio from "twilio";
 
 dotenv.config();
 
@@ -9,6 +10,11 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const SHEETDB_URL = "https://sheetdb.io/api/v1/wesan24zm1o21";
+
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 const sessions = {};
 
@@ -20,11 +26,21 @@ app.get("/health", (_, res) => {
   res.json({ status: "Julie is alive 🌿" });
 });
 
+async function sendWhatsApp(to, body) {
+  await twilioClient.messages.create({
+    from: "whatsapp:+14155238886",
+    to: to,
+    body: body
+  });
+}
+
 app.post("/webhook/whatsapp", async (req, res) => {
   const message = req.body?.Body || "";
   const from = req.body?.From;
   const numMedia = parseInt(req.body?.NumMedia || "0");
   console.log(`📨 Message de ${from} : ${message}`);
+
+  res.sendStatus(200);
 
   if (!sessions[from]) sessions[from] = {
     messages: [],
@@ -76,15 +92,13 @@ app.post("/webhook/whatsapp", async (req, res) => {
       }
 
       const prenom = sessions[from].nomClient ? ` ${sessions[from].nomClient}` : "";
-      res.set("Content-Type", "text/xml");
-      res.send(`<Response><Message>Merci${prenom} pour votre preuve de paiement ! 📸✅\n\nNotre équipe vérifie dans les 2 heures et active votre assistant. Bienvenue dans la famille AI SELLERS AGENCY ! 🌿</Message></Response>`);
+      await sendWhatsApp(from, `Merci${prenom} pour votre preuve de paiement ! 📸✅\n\nNotre équipe vérifie dans les 2 heures et active votre assistant. Bienvenue dans la famille AI SELLERS AGENCY ! 🌿`);
       return;
     }
 
     if (!sessions[from].dossierComplet) {
       sessions[from].photos.push("photo_produit");
-      res.set("Content-Type", "text/xml");
-      res.send(`<Response><Message>Photo reçue ! 📸✅ Envoyez d'autres photos ou tapez *continuer* pour passer à la suite 😊</Message></Response>`);
+      await sendWhatsApp(from, "Photo reçue ! 📸✅ Envoyez d'autres photos ou tapez *continuer* pour passer à la suite 😊");
       return;
     }
   }
@@ -94,8 +108,7 @@ app.post("/webhook/whatsapp", async (req, res) => {
     const accueil = "Bienvenue chez AI SELLERS AGENCY ! 🌿 Je suis Julie, votre conseillère digitale.\n\nPuis-je avoir votre prénom ?";
     sessions[from].messages.push({ role: "user", content: message });
     sessions[from].messages.push({ role: "assistant", content: accueil });
-    res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>${accueil}</Message></Response>`);
+    await sendWhatsApp(from, accueil);
     return;
   }
 
@@ -263,8 +276,7 @@ RÈGLES ABSOLUES
     .replace(/\[DOSSIER_COMPLET\]/g, "")
     .trim();
 
-  res.set("Content-Type", "text/xml");
-  res.send(`<Response><Message>${reply}</Message></Response>`);
+  await sendWhatsApp(from, reply);
 });
 
 app.listen(PORT, () => {
