@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";
-import { Twilio } from "twilio";
 
 dotenv.config();
 
@@ -11,10 +10,8 @@ const PORT = process.env.PORT || 3001;
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const SHEETDB_URL = "https://sheetdb.io/api/v1/wesan24zm1o21";
 
-const twilioClient = new Twilio = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 
 const sessions = {};
 
@@ -27,11 +24,25 @@ app.get("/health", (_, res) => {
 });
 
 async function sendWhatsApp(to, body) {
-  await twilioClient.messages.create({
-    from: "whatsapp:+14155238886",
-    to: to,
-    body: body
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`;
+  const params = new URLSearchParams();
+  params.append("From", "whatsapp:+14155238886");
+  params.append("To", to);
+  params.append("Body", body);
+
+  const credentials = Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString("base64");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: params
   });
+
+  const result = await response.json();
+  console.log(`📤 Message envoyé : ${result.sid || result.message}`);
 }
 
 app.post("/webhook/whatsapp", async (req, res) => {
@@ -209,11 +220,9 @@ RÈGLES ABSOLUES
 
   sessions[from].messages.push({ role: "assistant", content: reply });
 
-  // Extraire le prénom
   const nomClientMatch = reply.match(/\[NOM_CLIENT:(.+?)\]/);
   if (nomClientMatch) sessions[from].nomClient = nomClientMatch[1];
 
-  // Extraire les infos du dossier
   const nomBoutiqueMatch = reply.match(/\[NOM_BOUTIQUE:(.+?)\]/);
   const produitsMatch = reply.match(/\[PRODUITS:(.+?)\]/);
   const livraisonMatch = reply.match(/\[LIVRAISON:(.+?)\]/);
@@ -228,7 +237,6 @@ RÈGLES ABSOLUES
   if (numeroWAMatch) sessions[from].numeroWA = numeroWAMatch[1];
   if (autresMatch) sessions[from].autres = autresMatch[1];
 
-  // Sauvegarder prospect UNE SEULE FOIS
   const sauvegarderMatch = reply.match(/\[SAUVEGARDER:(.+?)\|(.+?)\|(.+?)\]/);
   if (sauvegarderMatch && !sessions[from].prospectNom) {
     const [, nom, ville, commerce] = sauvegarderMatch;
@@ -257,13 +265,11 @@ RÈGLES ABSOLUES
     }
   }
 
-  // Dossier complet
   if (reply.includes("[DOSSIER_COMPLET]")) {
     sessions[from].dossierComplet = true;
     console.log(`📋 Dossier complet pour ${from}`);
   }
 
-  // Nettoyer toutes les balises
   reply = reply
     .replace(/\[NOM_CLIENT:.+?\]/g, "")
     .replace(/\[NOM_BOUTIQUE:.+?\]/g, "")
