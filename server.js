@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";
-import twilio from "twilio";
+import { Twilio } from "twilio";
 
 dotenv.config();
 
@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3001;
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const SHEETDB_URL = "https://sheetdb.io/api/v1/wesan24zm1o21";
 
-const twilioClient = twilio(
+const twilioClient = new Twilio = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
 );
