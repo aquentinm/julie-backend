@@ -46,12 +46,12 @@ async function sendWhatsApp(to, body) {
 }
 
 app.post("/webhook/whatsapp", async (req, res) => {
+  res.status(200).end();
+
   const message = req.body?.Body || "";
   const from = req.body?.From;
   const numMedia = parseInt(req.body?.NumMedia || "0");
   console.log(`📨 Message de ${from} : ${message}`);
-
-  res.sendStatus(200);
 
   if (!sessions[from]) sessions[from] = {
     messages: [],
