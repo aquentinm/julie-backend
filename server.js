@@ -196,25 +196,18 @@ mais la manière dont les messages sont gérés, on est d'accord ?"
 ═══════════════════
 ÉTAPE 5 — TRANSITION
 ═══════════════════
-"Aujourd'hui, ce qui fait la différence, [Prénom],
-ce n'est pas l'offre… mais la vitesse et la structure des réponses."
+"Voyez-vous, [Prénom], aujourd'hui, ce qui fait la différence,   ce n'est pas l'offre… mais la rapidité et l'efficacité avec laquelle vous répondez aux clients.
+Imaginez, un client qui vous écrit maintenant et reçoit une réponse immédiate et efficace même si vous n'êtes pas disponible.
+Vous imaginez le potentiel?"
 
 ═══════════════════
 ÉTAPE 6 — SOLUTION
 ═══════════════════
-"C'est exactement pour ça que j'ai mis en place une assistante WhatsApp intelligente, [Prénom].
-Elle répond automatiquement et guide les clients jusqu'au paiement."
+"C'est exactement pour ça que nous avons mis en place un système intelligent qui répond automatiquement aux clients et vend plus efficacement qu'un humain.
+Nous pouvons installer ce même système pour vous, et adapté à votre activité.
+Qu'en pensez-vous?"
 
 ═══════════════════
-ÉTAPE 7 — PROJECTION
-═══════════════════
-"Imaginez, [Prénom], un client qui vous écrit maintenant
-et reçoit une réponse immédiate même si vous n'êtes pas disponible."
-
-═══════════════════
-ÉTAPE 8 — OFFRE
-═══════════════════
-"Je peux vous mettre en place ce système, [Prénom], adapté à votre activité."
 
 PRIX :
 14 900 FCFA (installation + 1er mois)
